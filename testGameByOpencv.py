@@ -10,6 +10,7 @@ import time
 import subprocess
 import glob
 import math
+from fractions import Fraction
 from os.path import getmtime
 import traceback
 from libs.AdbCommand import screencap
@@ -24,15 +25,17 @@ sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
 #portrait_thumbnailSize = (720.0, 1280.0)
 #landscape_thumbnailSize = (1280.0, 720.0)
 #thumbnail size = 1.2
-portrait_thumbnailSize = (900.0, 1600.0)
-landscape_thumbnailSize = (1600.0, 900.0)
+#portrait_thumbnailSize = (900.0, 1600.0)
+#landscape_thumbnailSize = (1600.0, 900.0)
+#portrait_thumbnailSize = (1152.0, 2048.0)   #1440*2560 缩放1.25倍
+#landscape_thumbnailSize = (2048.0, 1152.0)
 MIN_MATCH_COUNT = 4
 finishFlag = False
 #deviceName = '5LM7N16224000261'
 #deviceName = 'KWG5T17105003967'  #hw P9
 #deviceName = '63a9bca7'  #vivo
-#deviceName = 'LGH8689e43a709'  #LG
-deviceName = '635f9505'    #MI 5
+deviceName = 'LGH8689e43a709'  #LG
+#deviceName = '635f9505'    #MI 5
 
 
 def signal_handler(signal, frame):
@@ -78,10 +81,16 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     p1, p2, kp_pairs = filter_matches(kp1, kp2, raw_matches)
     print '###p1 len is %d, p2 len is %d, kp_pairs len is %d' % (len(p1), len(p2), len(kp_pairs))
 
+    inliers_num = 0
+    matched_num = 0
+
     if len(p1) >= MIN_MATCH_COUNT:
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)  #获取转换矩阵
+        inliers_num = np.sum(status)
+        matched_num = len(status)
         print '****%d / %d inliers/matched' % (np.sum(status), len(status))
-        if np.sum(status) < len(status)/2:
+
+        if inliers_num < matched_num/2:
             return None, None
     else:
         H, status = None, None
@@ -99,17 +108,26 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     rectangle_height = int(round(scene_corners[1][1])) - int(round(scene_corners[3][1]))
 
     img3 = cv2.rectangle(img2, (int(round(scene_corners[3][0])), int(round(scene_corners[3][1]))), (int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))), (0, 255, 0), 3)
-    resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
-    cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
-    if (abs(rectangle_width) < w1/3 and abs(rectangle_height) < h1/2) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5):
+    if (abs(rectangle_width) < w1/6 or abs(rectangle_height) < h1/6) or (rectangle_width > w1*1.1 or rectangle_height > h1*1.1):
+    #if (abs(rectangle_width) < 20 or abs(rectangle_height) < 20) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5):
         print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
+        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_error_match.png')
+        cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
         return None, None
+    else:
+        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
+        cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
+
     mid_cordinate_x = int(round((scene_corners[3][0]+scene_corners[1][0])/2))   #计算中心坐标
     mid_cordinate_y = int(round((scene_corners[3][1]+scene_corners[1][1])/2))
     #通过特征提取的图片被缩放了，所以计算真正比例的坐标需要在将计算得到的中心坐标在放大reduceRatio
-    real_x = math.floor(mid_cordinate_x * x_reduceRatio)
-    real_y = math.floor(mid_cordinate_y * y_reduceRatio)
+    x_fraction = mid_cordinate_x * x_reduceRatio
+    y_fraction = mid_cordinate_y * y_reduceRatio
+    real_x = math.floor(x_fraction.numerator/float(x_fraction.denominator))
+    real_y = math.floor(y_fraction.numerator/float(y_fraction.denominator))
     #print 'real x: %d, real y: %d' % (real_x, real_y)
+    if real_x < 0 or real_y < 0:
+        return None, None
     return real_x, real_y
 
 def thumbnail_pic(path, thumbnailSize):
@@ -122,7 +140,7 @@ def thumbnail_pic(path, thumbnailSize):
         savePath = path.replace('.png', '-thumbnail.png')
         im.save(savePath)
     except:
-        print 'thumbnail_pic catch exception: %s' % str(traceback.format_exec())
+        print 'thumbnail_pic catch exception: %s' % str(traceback.format_exc())
     return savePath
 
 def get_resolution():
@@ -161,18 +179,15 @@ def check_portrait_landscape():
 #密码： adb shell input text 123658
 
 if __name__ == '__main__':
-    x_reduceRatio = 1   #截图横坐标缩放倍数
-    y_reduceRatio = 1   #截图纵坐标缩放倍数
+    resolution = get_resolution()
+    if resolution[0] == 1080 and resolution[1] == 1920:
+        x_reduceRatio = 1
+        y_reduceRatio = 1
+    else:
+        x_reduceRatio = Fraction(4, 3)   #截图横坐标缩放倍数4/3
+        y_reduceRatio = Fraction(4, 3)   #截图纵坐标缩放倍数
     queryPkDic = {}
     queryPkList = []
-    for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
-        packagePath = packagePath[0:-1]
-        queryPkList.append(packagePath)
-    for packagePath in queryPkList:
-        packageName = packagePath[packagePath.rfind('/')+1:]
-        queryPkDic[packageName] = []
-        for queryPic in sorted(glob.glob(os.path.join(packagePath, '*-thumbnail.png')), key=getmtime):
-            queryPkDic[packageName].append(queryPic)
 
     clearLogCmd = 'adb shell logcat -c'
     os.system(clearLogCmd)
@@ -180,10 +195,10 @@ if __name__ == '__main__':
     readLogcatCmd = 'adb logcat -v time'
     proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     pkName = 'noName'
-    resolution = get_resolution()
 
     for line in proc.stdout:
-        if 'ActivityManager' in line and 'Displayed' in line:
+        if 'ActivityManager' in line and 'Displayed' in line and '.permission.' not in line and 'com.lge.' not in line:
+            print line
             line = line.replace('\r\n', '')
             splitLine = line.split(': ')
             pkItem = splitLine[1]
@@ -202,6 +217,8 @@ if __name__ == '__main__':
     scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
     if os.path.isdir(queryPkImageRoot) is False:
         os.makedirs(queryPkImageRoot)
+    else:
+        os.system("rm -rf %s/*-thumbnail.png" % queryPkImageRoot)
     if os.path.isdir(matchPkImageRoot) is False:
         os.makedirs(matchPkImageRoot)
     else:
@@ -211,6 +228,15 @@ if __name__ == '__main__':
     else:
         os.system('rm -rf %s/*.png' % scenePkImageRoot)
 
+    for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
+        packagePath = packagePath[0:-1]
+        queryPkList.append(packagePath)
+    for packagePath in queryPkList:
+        packageName = packagePath[packagePath.rfind('/')+1:]
+        queryPkDic[packageName] = []
+        for queryPic in sorted(glob.glob(os.path.join(packagePath, '*.png')), key=getmtime):
+            queryPkDic[packageName].append(queryPic)
+
     startTime = time.time()
     if queryPkDic.has_key(pkName):
         signal.signal(signal.SIGINT, signal_handler)
@@ -218,28 +244,37 @@ if __name__ == '__main__':
         time.sleep(8)
 
         screenType = check_portrait_landscape()
+        #因为此处已经知道计算后的结果是整数，所以缩放后的值就是分子
         if cmp(screenType, 'landscape') == 0:
-            thumbnailSize = landscape_thumbnailSize
+            thumbnail_x = resolution[1]/x_reduceRatio
+            thumbnail_y = resolution[0]/y_reduceRatio
+            thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #landscape_thumbnailSize
         else:
-            thumbnailSize = portrait_thumbnailSize
+            thumbnail_x = resolution[0]/x_reduceRatio
+            thumbnail_y = resolution[1]/y_reduceRatio
+            thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #portrait_thumbnailSize
         print 'thumbnailSize is %s' % str(thumbnailSize)
-        if cmp(screenType, 'landscape') == 0:
-            x_reduceRatio = round(resolution[0]/thumbnailSize[1],2)
-            y_reduceRatio = round(resolution[1]/thumbnailSize[0],2)
-        else:
-            x_reduceRatio = round(resolution[0]/thumbnailSize[0],2)
-            y_reduceRatio = round(resolution[1]/thumbnailSize[1],2)
+        #if cmp(screenType, 'landscape') == 0:
+        #    x_reduceRatio = round(resolution[0]/thumbnailSize[1],2)
+        #    y_reduceRatio = round(resolution[1]/thumbnailSize[0],2)
+        #else:
+        #    x_reduceRatio = round(resolution[0]/thumbnailSize[0],2)
+        #    y_reduceRatio = round(resolution[1]/thumbnailSize[1],2)
         print 'resolution is %s, x_reduceRatio is %s, y_reduceRatio is %s' % (str(resolution), str(x_reduceRatio), str(y_reduceRatio))
 
 
-        for queryImageThumbnailPath in queryPkDic[pkName]:
-            print '#####now query image is %s' % queryImageThumbnailPath
+        for queryImagePath in queryPkDic[pkName]:
+            print '#####now query image is %s' % queryImagePath
+            #如果都是使用1080*1920分辨率街区的截图，则queryImage不需要缩放了，只有对比的截图需要缩放
+            #queryImageThumbnailPath = thumbnail_pic(queryImagePath, thumbnailSize)
+            queryImageThumbnailPath = queryImagePath
             if finishFlag is True:
                 break
-            if 'goBack-thumbnail.png' in queryImageThumbnailPath:
+            if 'goBack.png' in queryImagePath:
                 print 'click goBack'
                 os.system('adb shell input keyevent 4')
-                time.sleep(2)
+                #os.remove(queryImageThumbnailPath)
+                time.sleep(4)
             else:
                 maxCmpCount = 20
                 while maxCmpCount > 0 and finishFlag is False:
@@ -250,18 +285,22 @@ if __name__ == '__main__':
                         maxCmpCount -= 1
                         continue
                     os.remove(sceneFilePath)    #删除未缩放的截图
-                    (x,y) = getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, 'screen-%d' % picNo)
+                    if '-thumbnail' not in queryImageThumbnailPath:
+                        matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:-4]
+                    else:
+                        matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:queryImageThumbnailPath.rfind('-')]
+                    (x,y) = getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, matchImgName)
                     picNo += 1
                     if (x,y) != (None, None):
                         print 'matching %s' % queryImageThumbnailPath
                         print 'click %d, %d' % (x, y)
                         os.system('adb shell input tap %d %d' % (x, y))
-                        time.sleep(2)
+                        #os.remove(queryImageThumbnailPath)
+                        time.sleep(4)
                         break
                     else:
                         maxCmpCount -= 1
                         time.sleep(2)
-                    #os.remove(sceneFileThumbnailPath)    #删除缩放后的截图，只保留match后的缩放截图
 
     endTime = time.time()
     print 'spend time is %s' % str(round(endTime-startTime, 3))
