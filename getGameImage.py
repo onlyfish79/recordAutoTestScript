@@ -15,10 +15,13 @@ sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
 #portrait_thumbnailSize = (720.0, 1280.0)
 #landscape_thumbnailSize = (1280.0, 720.0)
 #thumbnail size = 1.2
-portrait_thumbnailSize = (900.0, 1600.0)
-landscape_thumbnailSize = (1600.0, 900.0)
-#deviceName = 'KWG5T17105003967'
-deviceName = '5LM7N16224000261'
+#portrait_thumbnailSize = (900.0, 1600.0)
+#landscape_thumbnailSize = (1600.0, 900.0)
+portrait_thumbnailSize = (1080.0, 1920.0)
+landscape_thumbnailSize = (1920.0, 1080.0)
+deviceName = 'KWG5T17105003967'
+#deviceName = '5LM7N16224000261'
+#deviceName = 'LGH8689e43a709'
 
 def thumbnail_pic(path, thumbnailSize):
     im = Image.open(path)
@@ -115,7 +118,7 @@ if __name__ == '__main__':
                 y_reduceRatio = round(resolution[1]/thumbnailSize[1],2)
             print'resolution is %s, x_reduceRatio is %s, y_reduceRatio is %s' % (str(resolution), str(x_reduceRatio), str(y_reduceRatio))
 
-            sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
+            #sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
 
             endTime = time.time()
             print 'spend time is %s' % str(round(endTime-startTime, 3))
