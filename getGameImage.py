@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-#import sys
+import sys
 import os
 import time
 import subprocess
@@ -10,7 +10,7 @@ from PIL import Image
 from libs.GetDeviceInfo import getDeviceInfo
 
 currPath = os.getcwd()
-sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
+originSceneImageRoot = os.path.join(currPath, 'imageFile/originSceneImage')
 #thumbnail size = 1.5
 #portrait_thumbnailSize = (720.0, 1280.0)
 #landscape_thumbnailSize = (1280.0, 720.0)
@@ -67,8 +67,10 @@ if __name__ == '__main__':
     proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     pkName = 'noName'
     resolution = get_resolution()
-    for line in proc.stdout:
-        if 'ActivityManager' in line and 'Displayed' in line:
+    #for line in proc.stdout:
+    for line in iter(proc.stdout.readline, ''):
+        if 'ActivityManager' in line and 'Displayed' in line and '.permission.' not in line and 'com.lge.' not in line \
+                and 'com.android.packageinstaller' not in line:
             line = line.replace('\r\n', '')
             splitLine = line.split(': ')
             pkItem = splitLine[1]
@@ -77,6 +79,7 @@ if __name__ == '__main__':
             pkName = startInfo[0:startInfo.find('/')]
             print pkName
             break
+        sys.stdout.flush()
     proc.kill()
     proc.wait()
     print 'kill adb shell logcat thread: %d, pkName is %s' % (proc.pid, pkName)
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     #        screenCapFlag = raw_input("start to capture: ")
     #如果打开失败，或者是闪退，则输入'stop'退出
     if screenCapFlag != 'stop':
-        scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
+        scenePkImageRoot = os.path.join(originSceneImageRoot, pkName)
         if os.path.isdir(scenePkImageRoot) is False:
             os.makedirs(scenePkImageRoot)
 

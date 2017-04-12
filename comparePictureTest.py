@@ -13,7 +13,8 @@ currPath = os.getcwd()
 queryImageRoot = os.path.join(currPath, 'imageFile/queryImage')
 sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
 matchImageRoot = os.path.join(currPath, 'imageFile/matchImage')
-reduceRatio = 1.2   #截图缩放倍数
+reduceRatio = 1   #截图缩放倍数
+#reduceRatio = 1.6
 
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
     mkp1, mkp2 = [], []
@@ -60,9 +61,16 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     print '%s, w=%d, h=%d' % (filePath, w1, h1)
     print '%s, w=%d, h=%d' % (sceneFilePath, w2, h2)
 
+    inliers_num = 0
+    matched_num = 0
+
     if len(p1) >= 4:
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)  #获取转换矩阵
+        inliers_num = np.sum(status)
+        matched_num = len(status)
         print '%d / %d inliers/matched' % (np.sum(status), len(status))
+        if inliers_num < matched_num/2:
+            return None, None
     else:
         H, status = None, None
         print '%d matches found, not enough for homography estimation' % len(p1)
@@ -78,7 +86,7 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     img3 = cv2.rectangle(img2, (int(round(scene_corners[3][0])), int(round(scene_corners[3][1]))), (int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))), (0, 255, 0), 3)
     resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
     cv2.imwrite(resultFilePath, img3)
-    if (rectangle_width < w1/2 and rectangle_height < h1/2) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5):
+    if (abs(rectangle_width) < w1/3 and abs(rectangle_height) < h1/2 and inliers_num < matched_num) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5 and inliers_num < matched_num):
         print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
         return None, None
     mid_cordinate_x = int(round((scene_corners[3][0]+scene_corners[1][0])/2))   #计算中心坐标
@@ -93,6 +101,7 @@ def thumbnail_pic(path):
     thumbnailSize_x = int(math.ceil(x/reduceRatio))
     thumbnailSize_y = int(math.ceil(y/reduceRatio))
     thumbnailSize = (thumbnailSize_x, thumbnailSize_y)
+    print thumbnailSize
     im.thumbnail(thumbnailSize)
     savePath = path.replace('.png', '-thumbnail.png')
     #im.resize(thumbnailSize, Image.ANTIALIAS).save(savePath)
@@ -113,12 +122,14 @@ if __name__ == '__main__':
     if os.path.isdir(scenePkImageRoot) is False:
         os.makedirs(scenePkImageRoot)
     startTime = time.time()
-    queryImagePath = os.path.join(queryPkImageRoot, 'skipAmination-thumbnail.png')
-    sceneFilePath = os.path.join(scenePkImageRoot, 'screen-17-thumbnail.png')
+    queryImagePath = os.path.join(queryPkImageRoot, 'IKnown.png')
+    sceneFilePath = os.path.join(scenePkImageRoot, 'IKnown.png')
     #queryImageThumbnailPath = thumbnail_pic(queryImagePath)
     #sceneFileThumbnailPath = thumbnail_pic(sceneFilePath)
-    queryImageThumbnailPath = queryImagePath
-    sceneFileThumbnailPath = sceneFilePath
+    #queryImageThumbnailPath = queryImagePath
+    #sceneFileThumbnailPath = sceneFilePath
+    queryImageThumbnailPath = '/Users/helen/Desktop/exitGame-part.png'
+    sceneFileThumbnailPath = '/Users/helen/Desktop/exitGame.png'
 
     print getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, 'start')
     endTime = time.time()

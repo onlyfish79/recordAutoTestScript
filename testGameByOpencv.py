@@ -32,9 +32,9 @@ sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
 MIN_MATCH_COUNT = 4
 finishFlag = False
 #deviceName = '5LM7N16224000261'
-#deviceName = 'KWG5T17105003967'  #hw P9
+deviceName = 'KWG5T17105003967'  #hw P9
 #deviceName = '63a9bca7'  #vivo
-deviceName = 'LGH8689e43a709'  #LG
+#deviceName = 'LGH8689e43a709'  #LG
 #deviceName = '635f9505'    #MI 5
 
 
@@ -90,8 +90,8 @@ def getImgCordinate(filePath, sceneFilePath, flag):
         matched_num = len(status)
         print '****%d / %d inliers/matched' % (np.sum(status), len(status))
 
-        if inliers_num < matched_num/2:
-            return None, None
+        #if inliers_num < matched_num/2:
+        #    return None, None
     else:
         H, status = None, None
         print '****%d matches found, not enough for homography estimation' % len(p1)
@@ -104,11 +104,17 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     scene_corners = cv2.perspectiveTransform(obj_corners, H)  #坐标映射
     scene_corners = scene_corners.reshape(-1, 2)
     print int(round(scene_corners[3][0])), int(round(scene_corners[3][1])), int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))
-    rectangle_width = int(round(scene_corners[1][0])) - int(round(scene_corners[3][0]))
-    rectangle_height = int(round(scene_corners[1][1])) - int(round(scene_corners[3][1]))
+    x1 = int(round(scene_corners[3][0]))
+    y1 = int(round(scene_corners[3][1]))
+    x2 = int(round(scene_corners[1][0]))
+    y2 = int(round(scene_corners[1][1]))
+    rectangle_width = x2 - x1
+    rectangle_height = y2 - y1
+    #rectangle_width = int(round(scene_corners[1][0])) - int(round(scene_corners[3][0]))
+    #rectangle_height = int(round(scene_corners[1][1])) - int(round(scene_corners[3][1]))
 
     img3 = cv2.rectangle(img2, (int(round(scene_corners[3][0])), int(round(scene_corners[3][1]))), (int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))), (0, 255, 0), 3)
-    if (abs(rectangle_width) < w1/6 or abs(rectangle_height) < h1/6) or (rectangle_width > w1*1.1 or rectangle_height > h1*1.1):
+    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or (abs(rectangle_width) < w1/6 or abs(rectangle_height) < h1/6) or (rectangle_width > w1*1.1 or rectangle_height > h1*1.1):
     #if (abs(rectangle_width) < 20 or abs(rectangle_height) < 20) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5):
         print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
         resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_error_match.png')
@@ -196,8 +202,10 @@ if __name__ == '__main__':
     proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     pkName = 'noName'
 
-    for line in proc.stdout:
-        if 'ActivityManager' in line and 'Displayed' in line and '.permission.' not in line and 'com.lge.' not in line:
+    #for line in proc.stdout:
+    for line in iter(proc.stdout.readline, ''):
+        if 'ActivityManager' in line and 'Displayed' in line and '.permission.' not in line and 'com.lge.' not in line \
+                 and 'com.android.packageinstaller' not in line:
             print line
             line = line.replace('\r\n', '')
             splitLine = line.split(': ')
@@ -270,7 +278,8 @@ if __name__ == '__main__':
             queryImageThumbnailPath = queryImagePath
             if finishFlag is True:
                 break
-            if 'goBack.png' in queryImagePath:
+            queryImageName = queryImagePath[queryImagePath.rfind('/')+1:]
+            if queryImageName.startswith('goBack') is True and '-confirm.png' not in queryImageName:
                 print 'click goBack'
                 os.system('adb shell input keyevent 4')
                 #os.remove(queryImageThumbnailPath)
@@ -293,10 +302,15 @@ if __name__ == '__main__':
                     picNo += 1
                     if (x,y) != (None, None):
                         print 'matching %s' % queryImageThumbnailPath
-                        print 'click %d, %d' % (x, y)
-                        os.system('adb shell input tap %d %d' % (x, y))
-                        #os.remove(queryImageThumbnailPath)
-                        time.sleep(4)
+                        if queryImageName.startswith('goBack') is True:
+                            print 'click goBack need to confirm'
+                            os.system('adb shell input keyevent 4')
+                            time.sleep(4)
+                        else:
+                            print 'click %d, %d' % (x, y)
+                            os.system('adb shell input tap %d %d' % (x, y))
+                            #os.remove(queryImageThumbnailPath)
+                            time.sleep(4)
                         break
                     else:
                         maxCmpCount -= 1
