@@ -239,8 +239,6 @@ if __name__ == '__main__':
         else:
             pkName = key[0:key.rfind('_')]
 
-        if cmp('com.mojang.minecraftpe', pkName):
-            continue
         print 'test %s' % pkName
 
         if queryPkDic.has_key(pkName):
