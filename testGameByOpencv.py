@@ -191,6 +191,15 @@ def check_portrait_landscape():
             print 'dumpsys input has problem.......'
     return screenType
 
+def getQueryImageName(filePath):
+    fileName = None
+    if '-thumbnail' not in filePath:
+        fileName = filePath[filePath.rfind('/')+1:-4]
+    else:
+        fileName = filePath[filePath.rfind('/')+1:filePath.rfind('-')]
+    return fileName
+
+
 #360用户登录
 #用户名：adb shell input text 568042716@qq.com
 #回车： adb shell keyevent 66
@@ -212,6 +221,15 @@ if __name__ == '__main__':
         for name in files:
             testGameDic[name] = root
 
+    for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
+        packagePath = packagePath[0:-1]
+        queryPkList.append(packagePath)
+    for packagePath in queryPkList:
+        packageName = packagePath[packagePath.rfind('/')+1:]
+        queryPkDic[packageName] = []
+        for queryPic in sorted(glob.glob(os.path.join(packagePath, '*.png')), key=getmtime):
+            queryPkDic[packageName].append(queryPic)
+
     signal.signal(signal.SIGINT, signal_handler)
     for key, value in testGameDic.items():
         if finishFlag is True:
@@ -220,35 +238,30 @@ if __name__ == '__main__':
             pkName = key[key.rfind('-')+1:key.rfind('_')]
         else:
             pkName = key[0:key.rfind('_')]
+
+        if cmp('com.mojang.minecraftpe', pkName):
+            continue
         print 'test %s' % pkName
 
-        queryPkImageRoot = os.path.join(queryImageRoot, pkName)
-        matchPkImageRoot = os.path.join(matchImageRoot, pkName)
-        scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
-        if os.path.isdir(queryPkImageRoot) is False:
-            os.makedirs(queryPkImageRoot)
-        else:
-            os.system("rm -rf %s/*-thumbnail.png" % queryPkImageRoot)
-        if os.path.isdir(matchPkImageRoot) is False:
-            os.makedirs(matchPkImageRoot)
-        else:
-            os.system('rm -rf %s/*.png' % matchPkImageRoot)
-        if os.path.isdir(scenePkImageRoot) is False:
-            os.makedirs(scenePkImageRoot)
-        else:
-            os.system('rm -rf %s/*.png' % scenePkImageRoot)
-
-        for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
-            packagePath = packagePath[0:-1]
-            queryPkList.append(packagePath)
-        for packagePath in queryPkList:
-            packageName = packagePath[packagePath.rfind('/')+1:]
-            queryPkDic[packageName] = []
-            for queryPic in sorted(glob.glob(os.path.join(packagePath, '*.png')), key=getmtime):
-                queryPkDic[packageName].append(queryPic)
-
-        startTime = time.time()
         if queryPkDic.has_key(pkName):
+            queryPkImageRoot = os.path.join(queryImageRoot, pkName)
+            matchPkImageRoot = os.path.join(matchImageRoot, pkName)
+            scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
+            if os.path.isdir(queryPkImageRoot) is False:
+                os.makedirs(queryPkImageRoot)
+            else:
+                os.system("rm -rf %s/*-thumbnail.png" % queryPkImageRoot)
+            if os.path.isdir(matchPkImageRoot) is False:
+                os.makedirs(matchPkImageRoot)
+            else:
+                os.system('rm -rf %s/*.png' % matchPkImageRoot)
+            if os.path.isdir(scenePkImageRoot) is False:
+                os.makedirs(scenePkImageRoot)
+            else:
+                os.system('rm -rf %s/*.png' % scenePkImageRoot)
+
+
+            startTime = time.time()
             picNo = 0
             grantPermission(deviceName, pkName)
             openApkCmd = 'adb -s %s shell monkey -p %s -c android.intent.category.LAUNCHER 1' % (deviceName, pkName)
@@ -268,15 +281,19 @@ if __name__ == '__main__':
             print 'thumbnailSize is %s' % str(thumbnailSize)
             print 'resolution is %s, x_reduceRatio is %s, y_reduceRatio is %s' % (str(resolution), str(x_reduceRatio), str(y_reduceRatio))
 
-            for queryImagePath in queryPkDic[pkName]:
+            #for queryImagePath in queryPkDic[pkName]:
+            for index in range(len(queryPkDic[pkName])):
+                queryImagePath = queryPkDic[pkName][index]
                 print '#####now query image is %s' % queryImagePath
                 #如果都是使用1080*1920分辨率街区的截图，则queryImage不需要缩放了，只有对比的截图需要缩放
                 #queryImageThumbnailPath = thumbnail_pic(queryImagePath, thumbnailSize)
                 queryImageThumbnailPath = queryImagePath
+                skipFlag = False
                 if finishFlag is True:
                     break
                 queryImageName = queryImagePath[queryImagePath.rfind('/')+1:]
-                if queryImageName.startswith('goBack') is True and '-confirm.png' not in queryImageName:
+                if queryImageName.startswith('goBack') is True and '-confirm.png' not in queryImageName and \
+                        '-skipUseNext.png' not in queryImageName:
                     print 'click goBack'
                     os.system('adb shell input keyevent 4')
                     #os.remove(queryImageThumbnailPath)
@@ -291,12 +308,20 @@ if __name__ == '__main__':
                             maxCmpCount -= 1
                             continue
                         os.remove(sceneFilePath)    #删除未缩放的截图
-                        if '-thumbnail' not in queryImageThumbnailPath:
-                            matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:-4]
-                        else:
-                            matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:queryImageThumbnailPath.rfind('-')]
+                        matchImgName = getQueryImageName(queryImageThumbnailPath)
                         try:
                             (x,y) = getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, matchImgName)
+                            if '-skipUseNext.png' in queryImageName and index < len(queryPkDic[pkName])-1:
+                                nextQueryImageThumbnailPath = queryPkDic[pkName][index+1]
+                                nextMatchImage = getQueryImageName(nextQueryImageThumbnailPath)
+                                print 'need to use next query image: %s to check skip or not' % nextMatchImage
+                                while (x, y) == (None, None) and finishFlag is False and maxCmpCount > 0:
+                                    (x1, y1) = getImgCordinate(nextQueryImageThumbnailPath, sceneFileThumbnailPath, nextMatchImage)
+                                    if (x1, y1) != (None, None):
+                                        skipFlag = True
+                                        break
+                                    else:
+                                        maxCmpCount -= 1
                         except:
                             print 'get image cordinate catch exception, %s' % str(traceback.format_exc())
                             time.sleep(2)
@@ -317,20 +342,43 @@ if __name__ == '__main__':
                                 print 'click %d, %d' % (x, y)
                                 os.system('adb shell input tap %d %d' % (x, y))
                                 time.sleep(5)
+                            elif 'logIn' in queryImageName:
+                                print 'need to input userName and passworkd to logIn'
+                                userName = 'GK170417115512'
+                                pwd = '871234'
+                                os.system('adb shell input text %s' % userName)
+                                time.sleep(1.5)
+                                os.system('adb shell input keyevent 66')  #输入回车
+                                time.sleep(1.5)
+                                os.system('adb shell input text %s' % pwd)
+                                time.sleep(2)
+                                print 'click %d, %d' % (x, y)
+                                os.system('adb shell input tap %d %d' % (x, y))
+                                time.sleep(5)
+                            elif 'reStart' in queryImageName:
+                                print 'need to restart...'
+                                print 'click %d, %d' % (x, y)
+                                os.system('adb shell input tap %d %d' % (x, y))
+                                time.sleep(4)
+                                os.system(openApkCmd)
+                                time.sleep(8)
                             else:
                                 print 'click %d, %d' % (x, y)
                                 os.system('adb shell input tap %d %d' % (x, y))
                                 time.sleep(4)
                             break
+                        elif skipFlag is True:
+                            break
                         else:
                             maxCmpCount -= 1
                             time.sleep(2)
 
-        endTime = time.time()
-        print '%s spend time is %s' % (pkName, str(round(endTime-startTime, 3)))
-        clearCmd = 'adb shell pm clear %s' % pkName
-        os.system(clearCmd)
-        time.sleep(2)
-        os.system(clearCmd)
-
+            endTime = time.time()
+            print '%s spend time is %s' % (pkName, str(round(endTime-startTime, 3)))
+            clearCmd = 'adb shell pm clear %s' % pkName
+            os.system(clearCmd)
+            time.sleep(2)
+            os.system(clearCmd)
+        else:
+            print '%s not install, continue next game' % pkName
 
