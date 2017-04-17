@@ -7,7 +7,6 @@ import signal
 import sys
 import os
 import time
-import subprocess
 import glob
 import math
 from fractions import Fraction
@@ -21,6 +20,7 @@ currPath = os.getcwd()
 queryImageRoot = os.path.join(currPath, 'imageFile/queryImage')
 matchImageRoot = os.path.join(currPath, 'imageFile/matchImage')
 sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
+testAppRoot = os.path.join(currPath, 'apps')
 #thumbnail size = 1.5
 #portrait_thumbnailSize = (720.0, 1280.0)
 #landscape_thumbnailSize = (1280.0, 720.0)
@@ -36,6 +36,18 @@ deviceName = 'KWG5T17105003967'  #hw P9
 #deviceName = '63a9bca7'  #vivo
 #deviceName = 'LGH8689e43a709'  #LG
 #deviceName = '635f9505'    #MI 5
+
+permissions = ['android.permission.ACCESS_WIFI_STATE', 'android.permission.BLUETOOTH', \
+                'android.permission.ACCESS_FINE_LOCATION', 'android.permission.CAMERA', 'android.permission.READ_CALENDAR', \
+                'android.permission.READ_CONTACTS', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_PHONE_STATE', \
+                'android.permission.GET_TASKS', 'android.permission.WRITE_CALENDAR', 'android.permission.WRITE_CONTACTS', \
+                'android.permission.ACCESS_COARSE_LOCATION', 'android.permission.WRITE_EXTERNAL_STORAGE', 'android.permission.RECORD_AUDIO', \
+               'android.permission.READ_SMS', 'android.permission.RECEIVE_SMS']
+def grantPermission(deviceName, pkName):
+    for permission in permissions:
+        grantPermissionCmd = 'adb -s %s -d shell pm grant %s %s' % (deviceName, pkName, permission)
+        print 'grant permission cmd is: %s' % grantPermissionCmd
+        os.system(grantPermissionCmd)
 
 
 def signal_handler(signal, frame):
@@ -88,7 +100,7 @@ def getImgCordinate(filePath, sceneFilePath, flag):
         H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)  #获取转换矩阵
         inliers_num = np.sum(status)
         matched_num = len(status)
-        print '****%d / %d inliers/matched' % (np.sum(status), len(status))
+        print '****%d / %d inliers/matched' % (inliers_num, matched_num)
 
         #if inliers_num < matched_num/2:
         #    return None, None
@@ -194,129 +206,131 @@ if __name__ == '__main__':
         y_reduceRatio = Fraction(4, 3)   #截图纵坐标缩放倍数
     queryPkDic = {}
     queryPkList = []
+    testGameDic = {}
 
-    clearLogCmd = 'adb shell logcat -c'
-    os.system(clearLogCmd)
-    #readLogcatCmd = 'adb -s %s logcat -v time' % deviceName
-    readLogcatCmd = 'adb logcat -v time'
-    proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    pkName = 'noName'
+    for root, dirs, files in os.walk(testAppRoot):
+        for name in files:
+            testGameDic[name] = root
 
-    #for line in proc.stdout:
-    for line in iter(proc.stdout.readline, ''):
-        if 'ActivityManager' in line and 'Displayed' in line and '.permission.' not in line and 'com.lge.' not in line \
-                 and 'com.android.packageinstaller' not in line:
-            print line
-            line = line.replace('\r\n', '')
-            splitLine = line.split(': ')
-            pkItem = splitLine[1]
-            pkSplit = pkItem.split()
-            startInfo = pkSplit[1]
-            pkName = startInfo[0:startInfo.find('/')]
-            print pkName
+    signal.signal(signal.SIGINT, signal_handler)
+    for key, value in testGameDic.items():
+        if finishFlag is True:
             break
-    proc.kill()
-    proc.wait()
-    print 'kill adb shell logcat thread: %d, pkName is %s' % (proc.pid, pkName)
-
-
-    queryPkImageRoot = os.path.join(queryImageRoot, pkName)
-    matchPkImageRoot = os.path.join(matchImageRoot, pkName)
-    scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
-    if os.path.isdir(queryPkImageRoot) is False:
-        os.makedirs(queryPkImageRoot)
-    else:
-        os.system("rm -rf %s/*-thumbnail.png" % queryPkImageRoot)
-    if os.path.isdir(matchPkImageRoot) is False:
-        os.makedirs(matchPkImageRoot)
-    else:
-        os.system('rm -rf %s/*.png' % matchPkImageRoot)
-    if os.path.isdir(scenePkImageRoot) is False:
-        os.makedirs(scenePkImageRoot)
-    else:
-        os.system('rm -rf %s/*.png' % scenePkImageRoot)
-
-    for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
-        packagePath = packagePath[0:-1]
-        queryPkList.append(packagePath)
-    for packagePath in queryPkList:
-        packageName = packagePath[packagePath.rfind('/')+1:]
-        queryPkDic[packageName] = []
-        for queryPic in sorted(glob.glob(os.path.join(packagePath, '*.png')), key=getmtime):
-            queryPkDic[packageName].append(queryPic)
-
-    startTime = time.time()
-    if queryPkDic.has_key(pkName):
-        signal.signal(signal.SIGINT, signal_handler)
-        picNo = 0
-        time.sleep(8)
-
-        screenType = check_portrait_landscape()
-        #因为此处已经知道计算后的结果是整数，所以缩放后的值就是分子
-        if cmp(screenType, 'landscape') == 0:
-            thumbnail_x = resolution[1]/x_reduceRatio
-            thumbnail_y = resolution[0]/y_reduceRatio
-            thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #landscape_thumbnailSize
+        if '-' in key:
+            pkName = key[key.rfind('-')+1:key.rfind('_')]
         else:
-            thumbnail_x = resolution[0]/x_reduceRatio
-            thumbnail_y = resolution[1]/y_reduceRatio
-            thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #portrait_thumbnailSize
-        print 'thumbnailSize is %s' % str(thumbnailSize)
-        #if cmp(screenType, 'landscape') == 0:
-        #    x_reduceRatio = round(resolution[0]/thumbnailSize[1],2)
-        #    y_reduceRatio = round(resolution[1]/thumbnailSize[0],2)
-        #else:
-        #    x_reduceRatio = round(resolution[0]/thumbnailSize[0],2)
-        #    y_reduceRatio = round(resolution[1]/thumbnailSize[1],2)
-        print 'resolution is %s, x_reduceRatio is %s, y_reduceRatio is %s' % (str(resolution), str(x_reduceRatio), str(y_reduceRatio))
+            pkName = key[0:key.rfind('_')]
+        print 'test %s' % pkName
 
+        queryPkImageRoot = os.path.join(queryImageRoot, pkName)
+        matchPkImageRoot = os.path.join(matchImageRoot, pkName)
+        scenePkImageRoot = os.path.join(sceneImageRoot, pkName)
+        if os.path.isdir(queryPkImageRoot) is False:
+            os.makedirs(queryPkImageRoot)
+        else:
+            os.system("rm -rf %s/*-thumbnail.png" % queryPkImageRoot)
+        if os.path.isdir(matchPkImageRoot) is False:
+            os.makedirs(matchPkImageRoot)
+        else:
+            os.system('rm -rf %s/*.png' % matchPkImageRoot)
+        if os.path.isdir(scenePkImageRoot) is False:
+            os.makedirs(scenePkImageRoot)
+        else:
+            os.system('rm -rf %s/*.png' % scenePkImageRoot)
 
-        for queryImagePath in queryPkDic[pkName]:
-            print '#####now query image is %s' % queryImagePath
-            #如果都是使用1080*1920分辨率街区的截图，则queryImage不需要缩放了，只有对比的截图需要缩放
-            #queryImageThumbnailPath = thumbnail_pic(queryImagePath, thumbnailSize)
-            queryImageThumbnailPath = queryImagePath
-            if finishFlag is True:
-                break
-            queryImageName = queryImagePath[queryImagePath.rfind('/')+1:]
-            if queryImageName.startswith('goBack') is True and '-confirm.png' not in queryImageName:
-                print 'click goBack'
-                os.system('adb shell input keyevent 4')
-                #os.remove(queryImageThumbnailPath)
-                time.sleep(4)
+        for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
+            packagePath = packagePath[0:-1]
+            queryPkList.append(packagePath)
+        for packagePath in queryPkList:
+            packageName = packagePath[packagePath.rfind('/')+1:]
+            queryPkDic[packageName] = []
+            for queryPic in sorted(glob.glob(os.path.join(packagePath, '*.png')), key=getmtime):
+                queryPkDic[packageName].append(queryPic)
+
+        startTime = time.time()
+        if queryPkDic.has_key(pkName):
+            picNo = 0
+            grantPermission(deviceName, pkName)
+            openApkCmd = 'adb -s %s shell monkey -p %s -c android.intent.category.LAUNCHER 1' % (deviceName, pkName)
+            os.system(openApkCmd)
+            time.sleep(8)
+
+            screenType = check_portrait_landscape()
+            #因为此处已经知道计算后的结果是整数，所以缩放后的值就是分子
+            if cmp(screenType, 'landscape') == 0:
+                thumbnail_x = resolution[1]/x_reduceRatio
+                thumbnail_y = resolution[0]/y_reduceRatio
+                thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #landscape_thumbnailSize
             else:
-                maxCmpCount = 20
-                while maxCmpCount > 0 and finishFlag is False:
-                    sceneFilePath = os.path.join(scenePkImageRoot, 'screen-%d.png' % picNo)
-                    screencap(sceneFilePath, None)
-                    sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
-                    if sceneFileThumbnailPath is None:
-                        maxCmpCount -= 1
-                        continue
-                    os.remove(sceneFilePath)    #删除未缩放的截图
-                    if '-thumbnail' not in queryImageThumbnailPath:
-                        matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:-4]
-                    else:
-                        matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:queryImageThumbnailPath.rfind('-')]
-                    (x,y) = getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, matchImgName)
-                    picNo += 1
-                    if (x,y) != (None, None):
-                        print 'matching %s' % queryImageThumbnailPath
-                        if queryImageName.startswith('goBack') is True:
-                            print 'click goBack need to confirm'
-                            os.system('adb shell input keyevent 4')
-                            time.sleep(4)
-                        else:
-                            print 'click %d, %d' % (x, y)
-                            os.system('adb shell input tap %d %d' % (x, y))
-                            #os.remove(queryImageThumbnailPath)
-                            time.sleep(4)
-                        break
-                    else:
-                        maxCmpCount -= 1
-                        time.sleep(2)
+                thumbnail_x = resolution[0]/x_reduceRatio
+                thumbnail_y = resolution[1]/y_reduceRatio
+                thumbnailSize = (thumbnail_x.numerator, thumbnail_y.numerator) #portrait_thumbnailSize
+            print 'thumbnailSize is %s' % str(thumbnailSize)
+            print 'resolution is %s, x_reduceRatio is %s, y_reduceRatio is %s' % (str(resolution), str(x_reduceRatio), str(y_reduceRatio))
 
-    endTime = time.time()
-    print 'spend time is %s' % str(round(endTime-startTime, 3))
+            for queryImagePath in queryPkDic[pkName]:
+                print '#####now query image is %s' % queryImagePath
+                #如果都是使用1080*1920分辨率街区的截图，则queryImage不需要缩放了，只有对比的截图需要缩放
+                #queryImageThumbnailPath = thumbnail_pic(queryImagePath, thumbnailSize)
+                queryImageThumbnailPath = queryImagePath
+                if finishFlag is True:
+                    break
+                queryImageName = queryImagePath[queryImagePath.rfind('/')+1:]
+                if queryImageName.startswith('goBack') is True and '-confirm.png' not in queryImageName:
+                    print 'click goBack'
+                    os.system('adb shell input keyevent 4')
+                    #os.remove(queryImageThumbnailPath)
+                    time.sleep(4)
+                else:
+                    maxCmpCount = 20
+                    while maxCmpCount > 0 and finishFlag is False:
+                        sceneFilePath = os.path.join(scenePkImageRoot, 'screen-%d.png' % picNo)
+                        screencap(sceneFilePath, None)
+                        sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
+                        if sceneFileThumbnailPath is None:
+                            maxCmpCount -= 1
+                            continue
+                        os.remove(sceneFilePath)    #删除未缩放的截图
+                        if '-thumbnail' not in queryImageThumbnailPath:
+                            matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:-4]
+                        else:
+                            matchImgName = queryImageThumbnailPath[queryImageThumbnailPath.rfind('/')+1:queryImageThumbnailPath.rfind('-')]
+                        try:
+                            (x,y) = getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, matchImgName)
+                        except:
+                            print 'get image cordinate catch exception, %s' % str(traceback.format_exc())
+                            time.sleep(2)
+                            continue
+                        picNo += 1
+                        if (x,y) != (None, None):
+                            print 'matching %s' % queryImageThumbnailPath
+                            if queryImageName.startswith('goBack') is True:
+                                print 'click goBack need to confirm'
+                                os.system('adb shell input keyevent 4')
+                                time.sleep(4)
+                            elif 'clickSign' in queryImageName:
+                                print 'need to input password......'
+                                inputPwd = '872345'
+                                inputCmd = 'adb shell input text %s' % inputPwd
+                                os.system(inputCmd)
+                                time.sleep(2)
+                                print 'click %d, %d' % (x, y)
+                                os.system('adb shell input tap %d %d' % (x, y))
+                                time.sleep(5)
+                            else:
+                                print 'click %d, %d' % (x, y)
+                                os.system('adb shell input tap %d %d' % (x, y))
+                                time.sleep(4)
+                            break
+                        else:
+                            maxCmpCount -= 1
+                            time.sleep(2)
+
+        endTime = time.time()
+        print '%s spend time is %s' % (pkName, str(round(endTime-startTime, 3)))
+        clearCmd = 'adb shell pm clear %s' % pkName
+        os.system(clearCmd)
+        time.sleep(2)
+        os.system(clearCmd)
 
 
