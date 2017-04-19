@@ -81,14 +81,26 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     scene_corners = cv2.perspectiveTransform(obj_corners, H)  #坐标映射
     scene_corners = scene_corners.reshape(-1, 2)
     print int(round(scene_corners[3][0])), int(round(scene_corners[3][1])), int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))
-    rectangle_width = int(round(scene_corners[1][0])) - int(round(scene_corners[3][0]))
-    rectangle_height = int(round(scene_corners[1][1])) - int(round(scene_corners[3][1]))
+
+    x1 = int(round(scene_corners[3][0]))
+    y1 = int(round(scene_corners[3][1]))
+    x2 = int(round(scene_corners[1][0]))
+    y2 = int(round(scene_corners[1][1]))
+    rectangle_width = x2 - x1
+    rectangle_height = y2 - y1
+
     img3 = cv2.rectangle(img2, (int(round(scene_corners[3][0])), int(round(scene_corners[3][1]))), (int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))), (0, 255, 0), 3)
     resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
-    cv2.imwrite(resultFilePath, img3)
-    if (abs(rectangle_width) < w1/3 and abs(rectangle_height) < h1/2 and inliers_num < matched_num) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5 and inliers_num < matched_num):
+
+    #if (abs(rectangle_width) < w1/3 and abs(rectangle_height) < h1/2 and inliers_num < matched_num) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5 and inliers_num < matched_num):
+    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or (abs(rectangle_width) < w1/6 or abs(rectangle_height) < h1/6) or (rectangle_width > w1*1.1 or rectangle_height > h1*1.1):
         print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
+        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_error_match.png')
+        cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
         return None, None
+    else:
+        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
+        cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
     mid_cordinate_x = int(round((scene_corners[3][0]+scene_corners[1][0])/2))   #计算中心坐标
     mid_cordinate_y = int(round((scene_corners[3][1]+scene_corners[1][1])/2))
     #通过特征提取的图片被缩放了，所以计算真正比例的坐标需要在将计算得到的中心坐标在放大reduceRatio
@@ -122,14 +134,16 @@ if __name__ == '__main__':
     if os.path.isdir(scenePkImageRoot) is False:
         os.makedirs(scenePkImageRoot)
     startTime = time.time()
-    queryImagePath = os.path.join(queryPkImageRoot, 'IKnown.png')
-    sceneFilePath = os.path.join(scenePkImageRoot, 'IKnown.png')
+    #queryImagePath = os.path.join(queryPkImageRoot, 'IKnown.png')
+    #sceneFilePath = os.path.join(scenePkImageRoot, 'IKnown.png')
     #queryImageThumbnailPath = thumbnail_pic(queryImagePath)
     #sceneFileThumbnailPath = thumbnail_pic(sceneFilePath)
     #queryImageThumbnailPath = queryImagePath
     #sceneFileThumbnailPath = sceneFilePath
-    queryImageThumbnailPath = '/Users/helen/Desktop/exitGame-part.png'
-    sceneFileThumbnailPath = '/Users/helen/Desktop/exitGame.png'
+    #queryImageThumbnailPath = '/Users/helen/Desktop/clickCross2.png'
+    #sceneFileThumbnailPath = '/Users/helen/Desktop/clickCross2 2.png'
+    queryImageThumbnailPath = '/Users/helen/Desktop/IKnown 2.png'
+    sceneFileThumbnailPath = '/Users/helen/Desktop/IKnown.png'
 
     print getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, 'start')
     endTime = time.time()
