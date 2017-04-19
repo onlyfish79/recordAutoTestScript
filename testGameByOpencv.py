@@ -294,6 +294,8 @@ if __name__ == '__main__':
                         '-skipUseNext.png' not in queryImageName:
                     print 'click goBack'
                     os.system('adb shell input keyevent 4')
+                    if '-continue.png' in queryImageName:
+                        os.system('adb shell input keyevent 4')
                     #os.remove(queryImageThumbnailPath)
                     time.sleep(4)
                 else:
@@ -319,6 +321,9 @@ if __name__ == '__main__':
                                         skipFlag = True
                                         break
                                     else:
+                                        picNo += 1
+                                        sceneFilePath = os.path.join(scenePkImageRoot, 'screen-%d.png' % picNo)
+                                        screencap(sceneFilePath, None)
                                         maxCmpCount -= 1
                         except:
                             print 'get image cordinate catch exception, %s' % str(traceback.format_exc())
@@ -340,8 +345,8 @@ if __name__ == '__main__':
                                 print 'click %d, %d' % (x, y)
                                 os.system('adb shell input tap %d %d' % (x, y))
                                 time.sleep(5)
-                            elif 'logIn' in queryImageName:
-                                print 'need to input userName and passworkd to logIn'
+                            elif '360LogIn' in queryImageName:
+                                print 'need to input 360 userName and passworkd to logIn'
                                 userName = 'GK170417115512'
                                 pwd = '871234'
                                 os.system('adb shell input text %s' % userName)
