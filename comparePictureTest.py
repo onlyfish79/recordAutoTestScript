@@ -22,8 +22,10 @@ reduceRatio = 1   #截图缩放倍数
 #deviceName = '5LM7N16224000261'
 #deviceName = 'KWG5T17105003967'  #hw P9
 #deviceName = '63a9bca7'  #vivo
-deviceName = 'LGH8689e43a709'  #LG
+#deviceName = 'LGH8689e43a709'  #LG
 #deviceName = '635f9505'    #MI 5
+deviceName = 'R4WG45TCUCUCVGKN' #oppo
+
 
 def filter_matches(kp1, kp2, matches, ratio = 0.75):
     mkp1, mkp2 = [], []
@@ -69,6 +71,14 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     h2, w2 = img2.shape[:2]
     print '%s, w=%d, h=%d' % (filePath, w1, h1)
     print '%s, w=%d, h=%d' % (sceneFilePath, w2, h2)
+    if w2 > h2:
+        match_max_width = max(thumbnailSize[0], thumbnailSize[1])
+        match_max_height = min(thumbnailSize[0], thumbnailSize[1])
+    else:
+        match_max_width = min(thumbnailSize[0], thumbnailSize[1])
+        match_max_height = max(thumbnailSize[0], thumbnailSize[1])
+
+    print 'max_width is %d, max height is %d' % (match_max_width, match_max_height)
 
     inliers_num = 0
     matched_num = 0
@@ -99,16 +109,17 @@ def getImgCordinate(filePath, sceneFilePath, flag):
     rectangle_height = y2 - y1
 
     img3 = cv2.rectangle(img2, (int(round(scene_corners[3][0])), int(round(scene_corners[3][1]))), (int(round(scene_corners[1][0])), int(round(scene_corners[1][1]))), (0, 255, 0), 3)
-    resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
+    resultFilePath = os.path.join('/Users/helen/Desktop', flag+'_match.png')
+    print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
 
     #if (abs(rectangle_width) < w1/3 and abs(rectangle_height) < h1/2 and inliers_num < matched_num) or (rectangle_width > w1*1.5 and rectangle_height > h1*1.5 and inliers_num < matched_num):
-    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or (abs(rectangle_width) < w1/6 or abs(rectangle_height) < h1/6) or (rectangle_width > w1*1.1 or rectangle_height > h1*1.1):
-        print 'rectangle_width is %d, rectangle_height is %d' % (rectangle_width, rectangle_height)
-        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_error_match.png')
+    if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 > match_max_width or x2 > match_max_width or y1 > match_max_height or y2 > match_max_height \
+            or (abs(rectangle_width) < w1/2 or abs(rectangle_height) < h1/2) or (abs(rectangle_width) > w1*1.1 or abs(rectangle_height) > h1*1.1):
+        resultFilePath = os.path.join('/Users/helen/Desktop', flag+'_error_match.png')
         cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
         return None, None
     else:
-        resultFilePath = os.path.join(matchImageRoot, pkName, flag+'_match.png')
+        resultFilePath = os.path.join('/Users/helen/Desktop', flag+'_match.png')
         cv2.imwrite(resultFilePath, img3)   #保存在原始截图上标记query pic位置的图片
     mid_cordinate_x = int(round((scene_corners[3][0]+scene_corners[1][0])/2))   #计算中心坐标
     mid_cordinate_y = int(round((scene_corners[3][1]+scene_corners[1][1])/2))
@@ -205,12 +216,13 @@ if __name__ == '__main__':
     #sceneFileThumbnailPath = sceneFilePath
     #queryImageThumbnailPath = '/Users/helen/Desktop/clickCross2.png'
     #sceneFileThumbnailPath = '/Users/helen/Desktop/clickCross2 2.png'
-    queryImageThumbnailPath = '/Users/helen/Desktop/hostPluginMainPage.png'
-    sceneFilePath = '/Users/helen/Desktop/hostMain.png'
+    queryImageThumbnailPath = '/Users/helen/Desktop/R4WG45TCUCUCVGKN-PhoneHomePage.png'
+    sceneFilePath = '/Users/helen/Desktop/R4WG45TCUCUCVGKN-PhoneHomePage1.png'
     if resolution[0] == 1080 and resolution[1] == 1920:
         sceneFileThumbnailPath = sceneFilePath
     else:
         sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
+    sceneFileThumbnailPath = sceneFilePath
 
     print getImgCordinate(queryImageThumbnailPath, sceneFileThumbnailPath, 'start')
     endTime = time.time()

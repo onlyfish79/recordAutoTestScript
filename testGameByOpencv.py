@@ -20,7 +20,7 @@ currPath = os.getcwd()
 queryImageRoot = os.path.join(currPath, 'imageFile/queryImage')
 matchImageRoot = os.path.join(currPath, 'imageFile/matchImage')
 sceneImageRoot = os.path.join(currPath, 'imageFile/sceneImage')
-testAppRoot = os.path.join(currPath, 'apps')
+testAppRoot = os.path.join(currPath, 'gameApp')
 #thumbnail size = 1.5
 #portrait_thumbnailSize = (720.0, 1280.0)
 #landscape_thumbnailSize = (1280.0, 720.0)
@@ -220,6 +220,7 @@ if __name__ == '__main__':
     for root, dirs, files in os.walk(testAppRoot):
         for name in files:
             testGameDic[name] = root
+    print testGameDic
 
     for packagePath in glob.glob(os.path.join(queryImageRoot, '*/')):
         packagePath = packagePath[0:-1]
@@ -239,6 +240,8 @@ if __name__ == '__main__':
         else:
             pkName = key[0:key.rfind('_')]
 
+        #if cmp(pkName, 'com.fgol') != 0:
+        #    continue
         print 'test %s' % pkName
 
         if queryPkDic.has_key(pkName):
@@ -324,6 +327,7 @@ if __name__ == '__main__':
                                         picNo += 1
                                         sceneFilePath = os.path.join(scenePkImageRoot, 'screen-%d.png' % picNo)
                                         screencap(sceneFilePath, None)
+                                        sceneFileThumbnailPath = thumbnail_pic(sceneFilePath, thumbnailSize)
                                         maxCmpCount -= 1
                         except:
                             print 'get image cordinate catch exception, %s' % str(traceback.format_exc())
@@ -336,15 +340,6 @@ if __name__ == '__main__':
                                 print 'click goBack need to confirm'
                                 os.system('adb shell input keyevent 4')
                                 time.sleep(4)
-                            elif 'clickSign' in queryImageName:
-                                print 'need to input password......'
-                                inputPwd = '872345'
-                                inputCmd = 'adb shell input text %s' % inputPwd
-                                os.system(inputCmd)
-                                time.sleep(2)
-                                print 'click %d, %d' % (x, y)
-                                os.system('adb shell input tap %d %d' % (x, y))
-                                time.sleep(5)
                             elif '360LogIn' in queryImageName:
                                 print 'need to input 360 userName and passworkd to logIn'
                                 userName = 'GK170417115512'

@@ -19,9 +19,10 @@ originSceneImageRoot = os.path.join(currPath, 'imageFile/originSceneImage')
 #landscape_thumbnailSize = (1600.0, 900.0)
 portrait_thumbnailSize = (1080.0, 1920.0)
 landscape_thumbnailSize = (1920.0, 1080.0)
-deviceName = 'KWG5T17105003967'
+#deviceName = 'KWG5T17105003967'
 #deviceName = '5LM7N16224000261'
 #deviceName = 'LGH8689e43a709'
+deviceName = '63a9bca7'
 
 def thumbnail_pic(path, thumbnailSize):
     im = Image.open(path)
