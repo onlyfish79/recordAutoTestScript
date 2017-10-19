@@ -10,6 +10,7 @@ import subprocess
 from libs.GetDeviceInfo import getDeviceInfo
 from subprocess import PIPE, Popen
 from threading  import Thread
+from libs.AdbCommand import checkPackageInstall
 try:
     from Queue import Queue, Empty
 except ImportError:
@@ -246,22 +247,33 @@ def generate_script(pkName, resolution):
 
 
 if __name__ == '__main__':
-    clearLogCmd = 'adb shell logcat -c'
-    os.system(clearLogCmd)
-    readLogcatCmd = 'adb -s %s logcat -v time' % deviceName
-    proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    pkName = 'noName'
+    if 1 == 0:
+        clearLogCmd = 'adb shell logcat -c'
+        os.system(clearLogCmd)
+        readLogcatCmd = 'adb -s %s logcat -v time' % deviceName
+        proc = subprocess.Popen(readLogcatCmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        pkName = 'noName'
+        resolution = get_resolution()
+        for line in proc.stdout:
+            if 'PluginAutoTest' in line and 'install success' in line:
+                line = line.replace('\r\n', '')
+                splitLine = line.split(': ')
+                pkItem = splitLine[1]
+                pkSplit = pkItem.split()
+                pkName = pkSplit[0]
+                print pkName
+                break
+        proc.kill()
+        proc.wait()
+        print 'kill adb shell logcat thread: %d' % proc.pid
+    pkName = 'c.l.a'
     resolution = get_resolution()
-    for line in proc.stdout:
-        if 'PluginAutoTest' in line and 'install success' in line:
-            line = line.replace('\r\n', '')
-            splitLine = line.split(': ')
-            pkItem = splitLine[1]
-            pkSplit = pkItem.split()
-            pkName = pkSplit[0]
-            print pkName
+    while True:
+        ret = checkPackageInstall(pkName, deviceName)
+        if ret is True:
+            print '%s has installed..' % pkName
             break
-    proc.kill()
-    proc.wait()
-    print 'kill adb shell logcat thread: %d' % proc.pid
+        else:
+            print 'sleep 0.5s to wait %s install finish' % pkName
+            time.sleep(0.5)
     generate_script(pkName, resolution)

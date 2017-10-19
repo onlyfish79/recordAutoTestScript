@@ -60,3 +60,4 @@ __pycache__
 *.pyc
 *.html
 apps/*.apk
+libs/*.pyc
